@@ -1,16 +1,17 @@
 import numpy as np
 import cv2
 import os
-from utils import is_point_in_image
 from scipy.spatial import distance
-from postprocess import refine_kps
-from homography import get_trans_matrix, refer_kps
-from postprocess import postprocess
-from dataset import courtDataset
-from tracknet import BallTrackerNet
 import argparse
 import torch
 import torch.nn.functional as F
+
+from lib.utils import is_point_in_image
+from lib.postprocess import refine_kps
+from lib.homography import get_trans_matrix, refer_kps
+from lib.postprocess import postprocess
+from lib.dataset import courtDataset
+from lib.tracknet import BallTrackerNet
 
 if __name__ == '__main__':
 

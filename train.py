@@ -1,13 +1,14 @@
-from dataset import courtDataset
 import torch
 import torch.nn as nn
-from base_trainer import train
-from base_validator import val
 import os
-from tensorboardX import SummaryWriter
-from tracknet import BallTrackerNet
 import argparse
 from torch.optim import lr_scheduler
+from tensorboardX import SummaryWriter
+
+from lib.dataset import courtDataset
+from lib.base_trainer import train
+from lib.base_validator import val
+from lib.tracknet import BallTrackerNet
 
 if __name__ == '__main__':
     

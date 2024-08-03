@@ -1,7 +1,8 @@
-from court_reference import CourtReference
 import numpy as np
 import cv2
 from scipy.spatial import distance
+
+from lib.court_reference import CourtReference
 
 court_ref = CourtReference()
 refer_kps = np.array(court_ref.key_points, dtype=np.float32).reshape((-1, 1, 2))

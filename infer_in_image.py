@@ -1,11 +1,13 @@
 import cv2
 import numpy as np
 import torch
-from tracknet import BallTrackerNet
 import torch.nn.functional as F
-from postprocess import postprocess, refine_kps
-from homography import get_trans_matrix, refer_kps
 import argparse
+
+from lib.tracknet import BallTrackerNet
+from lib.postprocess import postprocess, refine_kps
+from lib.homography import get_trans_matrix, refer_kps
+
 
 if __name__ == '__main__':
 
