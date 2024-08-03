@@ -6,11 +6,15 @@ from scipy.spatial import distance
 from lib.utils import line_intersection
 
 
-def postprocess(heatmap, scale, low_thresh=155, min_radius=10, max_radius=30):
-    x_pred, y_pred = None, None
-    ret, heatmap = cv2.threshold(heatmap, low_thresh, 255, cv2.THRESH_BINARY)
+def postprocess(heatmap, scale, low_thresh=0.6, min_radius=10, max_radius=30):
+    # x is vertical and y is horizontal
+    x_pred, y_pred, hough_radius, likelihood = None, None, None, 0
+    ret, binary_heatmap = cv2.threshold(
+        (heatmap * 255).astype(np.uint8), low_thresh * 255, 255, cv2.THRESH_BINARY
+    )
+
     circles = cv2.HoughCircles(
-        heatmap,
+        binary_heatmap,
         cv2.HOUGH_GRADIENT,
         dp=1,
         minDist=20,
@@ -19,10 +23,21 @@ def postprocess(heatmap, scale, low_thresh=155, min_radius=10, max_radius=30):
         minRadius=min_radius,
         maxRadius=max_radius,
     )
+
     if circles is not None:
-        x_pred = circles[0][0][0] * scale[0]
-        y_pred = circles[0][0][1] * scale[1]
-    return x_pred, y_pred
+        y_pred = circles[0][0][0]
+        x_pred = circles[0][0][1]
+        hough_radius = circles[0][0][2]
+
+        if (
+            x_pred >= 0
+            and x_pred < heatmap.shape[0]
+            and y_pred >= 0
+            and y_pred < heatmap.shape[1]
+        ):
+            likelihood = heatmap[int(x_pred + 0.5)][int(y_pred + 0.5)]
+
+    return x_pred * scale[0], y_pred * scale[1], likelihood, hough_radius
 
 
 def refine_kps(img, x_ct, y_ct, crop_size=40):
@@ -52,7 +67,7 @@ def refine_kps(img, x_ct, y_ct, crop_size=40):
                 ):
                     refined_x_ct = x_min + new_x_ct
                     refined_y_ct = y_min + new_y_ct
-    return refined_y_ct, refined_x_ct
+    return refined_x_ct, refined_y_ct
 
 
 def detect_lines(image):

@@ -1,7 +1,7 @@
 import json
 import cv2
-import numpy as np
 import argparse
+from lib.utils import wait_for_image_visualization_key
 
 
 if __name__ == "__main__":
@@ -58,14 +58,4 @@ if __name__ == "__main__":
 
             cv2.imshow("image", image)
 
-            while True:
-                key = cv2.waitKey(0)
-                if key == ord("q") or i == len(data) - 1:
-                    cv2.destroyAllWindows()
-                    exit()
-                if key == ord(","):
-                    i = max(0, i - 1)
-                    break
-                elif key == ord("."):
-                    i += 1
-                    break
+            i = wait_for_image_visualization_key(i, len(data))

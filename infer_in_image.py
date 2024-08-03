@@ -8,6 +8,7 @@ from lib.tracknet import BallTrackerNet
 from lib.postprocess import postprocess, refine_kps, get_labeled_points
 from lib.parameters import *
 from lib.calibration import *
+from lib.utils import wait_for_image_visualization_key
 
 
 if __name__ == "__main__":
@@ -38,6 +39,11 @@ if __name__ == "__main__":
         action="store_true",
         help="whether to apply 2d to 3d conversion and plot 3d coordinates",
     )
+    parser.add_argument(
+        "--debug_likelihood",
+        action="store_true",
+        help="Debug likelihood distribution for each of the inferred points",
+    )
     args = parser.parse_args()
 
     model = BallTrackerNet(out_channels=15)
@@ -57,18 +63,34 @@ if __name__ == "__main__":
     print("image loaded")
 
     out = model(inp.float().to(device))[0]
-    pred = F.sigmoid(out).detach().cpu().numpy()
+    heatmap = F.sigmoid(out).detach().cpu().numpy()
     print("image inferred")
 
+    # plot debug likelihood
+    if args.debug_likelihood:
+        i = 0
+        while i < 14:
+            alpha = 0.2
+            mask = alpha + (1 - alpha) * heatmap[i].astype(np.float32)
+            mask = cv2.resize(
+                mask, (image.shape[1], image.shape[0]), interpolation=cv2.INTER_LINEAR
+            )
+            mask = np.stack([mask] * 3, axis=-1)
+            masked_image = (image * mask).astype(np.uint8)
+            cv2.imshow("image", masked_image)
+            i = wait_for_image_visualization_key(i, 14)
+
+    # Get inferred points
     inferred_points = []
-    for kps_num in range(14):
-        heatmap = (pred[kps_num] * 255).astype(np.uint8)
-        # cv2.imshow('heatmap', heatmap)
-        # cv2.waitKey(0)
-        x_pred, y_pred = postprocess(heatmap, scale, low_thresh=170, max_radius=25)
-        if args.use_refine_kps and kps_num not in [8, 12, 9] and x_pred and y_pred:
-            x_pred, y_pred = refine_kps(image, int(y_pred), int(x_pred))
+    point_likelihoods = []
+    for i in range(14):
+        x_pred, y_pred, likelihood, hough_radius = postprocess(
+            heatmap[i], scale, low_thresh=0.6, max_radius=25
+        )
+        if args.use_refine_kps and i not in [8, 12, 9] and x_pred and y_pred:
+            x_pred, y_pred = refine_kps(image, int(x_pred), int(y_pred))
         inferred_points.append((x_pred, y_pred))
+        point_likelihoods.append((likelihood, hough_radius))
 
     if args.plot_label:
         labeled_points = get_labeled_points(args.input_path)
@@ -86,7 +108,7 @@ if __name__ == "__main__":
         if inferred_points[i][0] is not None:
             image = cv2.circle(
                 image,
-                (int(inferred_points[i][0]), int(inferred_points[i][1])),
+                (int(inferred_points[i][1]), int(inferred_points[i][0])),
                 radius=0,
                 color=(0, 0, 255),
                 thickness=10,
@@ -94,7 +116,7 @@ if __name__ == "__main__":
             image = cv2.putText(
                 image,
                 str(i),
-                (int(inferred_points[i][0]), int(inferred_points[i][1])),
+                (int(inferred_points[i][1]), int(inferred_points[i][0])),
                 cv2.FONT_HERSHEY_SIMPLEX,
                 fontScale=0.8,
                 color=(0, 0, 0),
@@ -113,7 +135,7 @@ if __name__ == "__main__":
         for i in range(len(pixel_points)):
             image = cv2.circle(
                 image,
-                (int(pixel_points[i][0]), int(pixel_points[i][1])),
+                (int(pixel_points[i][1]), int(pixel_points[i][0])),
                 radius=0,
                 color=(0, 255, 0),
                 thickness=10,

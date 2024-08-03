@@ -1,6 +1,7 @@
 import numpy as np
 from sympy import Line
 import sympy
+import cv2
 
 
 def gaussian2D(shape, sigma=1):
@@ -75,3 +76,15 @@ def is_point_in_image(x, y, input_width=1280, input_height=720):
     if x and y:
         res = (x >= 0) and (x <= input_width) and (y >= 0) and (y <= input_height)
     return res
+
+
+def wait_for_image_visualization_key(idx, max_idx):
+    while True:
+        key = cv2.waitKey(0)
+        if key == ord("q") or idx == max_idx - 1:
+            cv2.destroyAllWindows()
+            exit()
+        if key == ord(","):
+            return max(0, idx - 1)
+        elif key == ord("."):
+            return idx + 1
