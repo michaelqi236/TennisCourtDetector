@@ -40,6 +40,7 @@ if __name__ == '__main__':
 
     model = BallTrackerNet(out_channels=15)
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    print('using device', device)
     model = model.to(device)
 
     exps_path = './exps/{}'.format(args.exp_id)
