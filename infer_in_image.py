@@ -5,7 +5,7 @@ import torch.nn.functional as F
 import argparse
 
 from lib.tracknet import BallTrackerNet
-from lib.postprocess import postprocess, refine_kps
+from lib.postprocess import postprocess, refine_kps, get_labeled_points
 from lib.homography import get_trans_matrix, refer_kps
 
 
@@ -17,6 +17,7 @@ if __name__ == '__main__':
     parser.add_argument('--output_path', type=str, help='path to output image')
     parser.add_argument('--use_refine_kps', action='store_true', help='whether to use refine kps postprocessing')
     parser.add_argument('--use_homography', action='store_true', help='whether to use homography postprocessing')
+    parser.add_argument('--plot_label', action='store_true', help='whether to plot the train/val label')
     args = parser.parse_args()
 
     model = BallTrackerNet(out_channels=15)
@@ -59,11 +60,18 @@ if __name__ == '__main__':
             points = cv2.perspectiveTransform(refer_kps, matrix_trans)
             points = [np.squeeze(x) for x in points]
 
-    for j in range(len(points)):
-        if points[j][0] is not None:
-            image = cv2.circle(image, (int(points[j][0]), int(points[j][1])),
+    if args.plot_label:
+        labeled_points = get_labeled_points(args.input_path)
+        for i in range(len(labeled_points)):
+            image = cv2.circle(image, (int(labeled_points[i][0]), int(labeled_points[i][1])),
+                               radius=0, color=(255, 0, 0), thickness=10)
+
+    # Plot inferred points
+    for i in range(len(points)):
+        if points[i][0] is not None:
+            image = cv2.circle(image, (int(points[i][0]), int(points[i][1])),
                                radius=0, color=(0, 0, 255), thickness=10)
-            image = cv2.putText(image, str(j), (int(points[j][0]), int(points[j][1])), 
+            image = cv2.putText(image, str(i), (int(points[i][0]), int(points[i][1])), 
                                 cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.8, color=(0, 0, 0),thickness=2)
 
     if args.output_path:

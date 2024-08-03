@@ -1,5 +1,7 @@
 import cv2
 import numpy as np
+import os
+import json
 from scipy.spatial import distance
 from lib.utils import line_intersection
 
@@ -71,3 +73,19 @@ def merge_lines(lines):
             new_lines.append(line)  
     return new_lines       
 
+def get_labeled_points(input_path):
+    image_name = input_path.split('.')[0].split('/')[-1]
+    
+    with open('data/data_train.json', 'r') as f:
+        data = json.load(f)
+        for i in range(len(data)):
+            if image_name == data[i]['id']:
+                return data[i]['kps']
+    
+    with open('data/data_val.json', 'r') as f:
+        data = json.load(f)
+        for i in range(len(data)):
+            if image_name == data[i]['id']:
+                return data[i]['kps']
+
+    return []
