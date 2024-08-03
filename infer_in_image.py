@@ -13,6 +13,7 @@ from lib.postprocess import (
 )
 from lib.parameters import *
 from lib.calibration import *
+from lib.utils import to_int
 
 
 if __name__ == "__main__":
@@ -59,7 +60,10 @@ if __name__ == "__main__":
 
     print("loading image")
     image = cv2.imread(args.input_path)
-    scale = [image.shape[0] / OUTPUT_HEIGHT, image.shape[1] / OUTPUT_WIDTH]
+    if image.shape[0] / OUTPUT_HEIGHT != image.shape[1] / OUTPUT_WIDTH:
+        print("Image size must be proportional to", OUTPUT_HEIGHT, "x", OUTPUT_WIDTH)
+        exit()
+    scale = image.shape[0] / OUTPUT_HEIGHT
     img = cv2.resize(image, (OUTPUT_WIDTH, OUTPUT_HEIGHT))
     inp = img.astype(np.float32) / 255.0
     inp = torch.tensor(np.rollaxis(inp, 2, 0))
@@ -72,26 +76,42 @@ if __name__ == "__main__":
     print("plotting")
     # plot debug likelihood
     if args.debug_likelihood:
-        plot_likelihood_distribution(heatmap, image, scale)
+        point_idx = 0
+        while point_idx < OUTPUT_POINT_NUM:
+            point_idx = plot_likelihood_distribution(
+                heatmap,
+                image,
+                scale,
+                thresh=MODEL_OUTPUT_BIN_THRESHOLD,
+                min_radius=CIRCLE_MIN_RADIUS,
+                max_radius=CIRCLE_MAX_RADIUS,
+                point_idx=point_idx,
+            )
 
     # Get inferred points
     inferred_points = []
     point_likelihoods = []
     for i in range(14):
-        x_pred, y_pred, likelihood, hough_radius = postprocess(
-            heatmap[i], scale, low_thresh=0.6, max_radius=25
+        x_pred, y_pred, likelihood = postprocess(
+            heatmap[i],
+            scale,
+            thresh=MODEL_OUTPUT_BIN_THRESHOLD,
+            min_radius=CIRCLE_MIN_RADIUS,
+            max_radius=CIRCLE_MAX_RADIUS,
         )
         if args.use_refine_kps and i not in [8, 12, 9] and x_pred and y_pred:
-            x_pred, y_pred = refine_kps(image, int(x_pred), int(y_pred))
+            x_pred, y_pred = refine_kps(
+                image, to_int(x_pred), to_int(y_pred), scale, REFINE_CROP_SIZE
+            )
         inferred_points.append((x_pred, y_pred))
-        point_likelihoods.append((likelihood, hough_radius))
+        point_likelihoods.append(likelihood)
 
     if args.plot_label:
         labeled_points = get_labeled_points(args.input_path)
         for i in range(len(labeled_points)):
             image = cv2.circle(
                 image,
-                (int(labeled_points[i][0]), int(labeled_points[i][1])),
+                (to_int(labeled_points[i][0]), to_int(labeled_points[i][1])),
                 radius=0,
                 color=(255, 0, 0),
                 thickness=10,
@@ -102,7 +122,7 @@ if __name__ == "__main__":
         if inferred_points[i][0] is not None:
             image = cv2.circle(
                 image,
-                (int(inferred_points[i][1]), int(inferred_points[i][0])),
+                (to_int(inferred_points[i][1]), to_int(inferred_points[i][0])),
                 radius=0,
                 color=(0, 0, 255),
                 thickness=10,
@@ -110,21 +130,11 @@ if __name__ == "__main__":
             image = cv2.putText(
                 image,
                 str(i),
-                (int(inferred_points[i][1]), int(inferred_points[i][0])),
+                (to_int(inferred_points[i][1]), to_int(inferred_points[i][0])),
                 cv2.FONT_HERSHEY_SIMPLEX,
                 fontScale=0.8,
                 color=(0, 0, 0),
                 thickness=2,
-            )
-            image = cv2.ellipse(
-                image,
-                (int(inferred_points[i][1]), int(inferred_points[i][0])),
-                point_likelihoods[i][1],
-                angle=0,
-                startAngle=0,
-                endAngle=360,
-                color=(0, 0, 255),
-                thickness=1,
             )
 
     # Plot world 3d coordinates
@@ -139,7 +149,7 @@ if __name__ == "__main__":
         for i in range(len(pixel_points)):
             image = cv2.circle(
                 image,
-                (int(pixel_points[i][1]), int(pixel_points[i][0])),
+                (to_int(pixel_points[i][1]), to_int(pixel_points[i][0])),
                 radius=0,
                 color=(0, 255, 0),
                 thickness=10,

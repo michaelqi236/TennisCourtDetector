@@ -69,7 +69,7 @@ if __name__ == "__main__":
                 points_pred = []
                 for kps_num in range(14):
                     heatmap = (pred[bs][kps_num] * 255).astype(np.uint8)
-                    x_pred, y_pred = postprocess(heatmap, low_thresh=170, max_radius=25)
+                    x_pred, y_pred = postprocess(heatmap, thresh=170, max_radius=25)
                     if (
                         args.use_refine_kps
                         and kps_num not in [8, 12, 9]

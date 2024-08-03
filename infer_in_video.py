@@ -84,7 +84,7 @@ if __name__ == "__main__":
         points = []
         for kps_num in range(14):
             heatmap = (pred[kps_num] * 255).astype(np.uint8)
-            x_pred, y_pred = postprocess(heatmap, low_thresh=170, max_radius=25)
+            x_pred, y_pred = postprocess(heatmap, thresh=170, max_radius=25)
             if args.use_refine_kps and kps_num not in [8, 12, 9] and x_pred and y_pred:
                 x_pred, y_pred = refine_kps(image, int(y_pred), int(x_pred))
             points.append((x_pred, y_pred))

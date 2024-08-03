@@ -4,6 +4,10 @@ import sympy
 import cv2
 
 
+def to_int(x: float):
+    return int(x + 0.5)
+
+
 def gaussian2D(shape, sigma=1):
     m, n = [(ss - 1.0) / 2.0 for ss in shape]
     y, x = np.ogrid[-m : m + 1, -n : n + 1]
@@ -17,7 +21,7 @@ def draw_umich_gaussian(heatmap, center, radius, k=1):
     diameter = 2 * radius + 1
     gaussian = gaussian2D((diameter, diameter), sigma=diameter / 6)
 
-    x, y = int(center[0]), int(center[1])
+    x, y = to_int(center[0]), to_int(center[1])
 
     height, width = heatmap.shape[0:2]
 
@@ -79,12 +83,14 @@ def is_point_in_image(x, y, input_width=1280, input_height=720):
 
 
 def wait_for_image_visualization_key(idx, max_idx):
-    while True:
+    while idx < max_idx:
         key = cv2.waitKey(0)
-        if key == ord("q") or idx == max_idx - 1:
+        if key == ord("q"):
             cv2.destroyAllWindows()
             exit()
         if key == ord(","):
             return max(0, idx - 1)
         elif key == ord("."):
+            if idx + 1 == max_idx:
+                cv2.destroyAllWindows()
             return idx + 1

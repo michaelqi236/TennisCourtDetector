@@ -29,7 +29,7 @@ if __name__ == "__main__":
             image = cv2.putText(
                 image,
                 image_path,
-                (int(0.7 * image.shape[1]), int(0.95 * image.shape[0])),
+                (to_int(0.7 * image.shape[1]), to_int(0.95 * image.shape[0])),
                 cv2.FONT_HERSHEY_SIMPLEX,
                 fontScale=0.6,
                 color=(255, 255, 255),
@@ -41,7 +41,7 @@ if __name__ == "__main__":
             for j in range(len(labeled_points)):
                 image = cv2.circle(
                     image,
-                    (int(labeled_points[j][0]), int(labeled_points[j][1])),
+                    (to_int(labeled_points[j][0]), to_int(labeled_points[j][1])),
                     radius=0,
                     color=(255, 0, 0),
                     thickness=10,
@@ -49,7 +49,7 @@ if __name__ == "__main__":
                 image = cv2.putText(
                     image,
                     str(j),
-                    (int(labeled_points[j][0]), int(labeled_points[j][1])),
+                    (to_int(labeled_points[j][0]), to_int(labeled_points[j][1])),
                     cv2.FONT_HERSHEY_SIMPLEX,
                     fontScale=0.8,
                     color=(0, 0, 0),

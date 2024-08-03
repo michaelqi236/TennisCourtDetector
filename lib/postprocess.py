@@ -2,56 +2,56 @@ import cv2
 import numpy as np
 import json
 from scipy.spatial import distance
-from lib.utils import line_intersection, wait_for_image_visualization_key
+from lib.utils import line_intersection, wait_for_image_visualization_key, to_int
+from lib.parameters import *
 
 
-def postprocess(heatmap, scale, low_thresh=0.6, min_radius=10, max_radius=30):
-    # x is vertical and y is horizontal
-    x_pred, y_pred, hough_radius, likelihood = None, None, None, 0
+def calculate_edge_likelihood_map(heatmap):
+    # Generate edge likelihood map
+    edge_thickness = 15
+    edge_likelihood_map = cv2.Canny(heatmap, 50, 150)
+    edge_likelihood_map = cv2.GaussianBlur(
+        edge_likelihood_map, (edge_thickness, edge_thickness), 255
+    )
+    edge_likelihood_map = (
+        edge_likelihood_map / np.max(edge_likelihood_map) * 255
+    ).astype(np.uint8)
+    # cv2.imshow("blured edge_likelihood_map", edge_likelihood_map)
+
+    return edge_likelihood_map
+
+
+def calculate_binary_heatmap(heatmap, thresh):
+    blurred_heatmap = cv2.GaussianBlur((heatmap * 255).astype(np.uint8), (15, 15), 5)
     ret, binary_heatmap = cv2.threshold(
-        (heatmap * 255).astype(np.uint8), low_thresh * 255, 255, cv2.THRESH_BINARY
+        blurred_heatmap, thresh * 255, 255, cv2.THRESH_BINARY
     )
+    return binary_heatmap
 
-    circles = cv2.HoughCircles(
-        binary_heatmap,
-        cv2.HOUGH_GRADIENT,
-        dp=1,
-        minDist=20,
-        param1=50,
-        param2=2,
-        minRadius=min_radius,
-        maxRadius=max_radius,
+
+def calculate_circle_likelihood(edge_likelihood_map, x, y, r):
+    # Get weighted likelihood on the circle
+    mask = np.zeros_like(edge_likelihood_map)
+    cv2.circle(
+        mask,
+        (to_int(y), to_int(x)),
+        radius=to_int(r),
+        color=255,
+        thickness=1,
     )
+    weighted_likelihood = np.mean(edge_likelihood_map[mask == 255]) / 255
 
-    if circles is not None:
-        y_pred = circles[0][0][0]
-        x_pred = circles[0][0][1]
-        hough_radius = circles[0][0][2]
-
-        if (
-            x_pred >= 0
-            and x_pred < heatmap.shape[0]
-            and y_pred >= 0
-            and y_pred < heatmap.shape[1]
-        ):
-            likelihood = heatmap[int(x_pred + 0.5)][int(y_pred + 0.5)]
-
-    return (
-        x_pred * scale[0],
-        y_pred * scale[1],
-        likelihood,
-        (int(hough_radius * scale[0] + 0.5), int(hough_radius * scale[1] + 0.5)),
-    )
+    return weighted_likelihood
 
 
-def refine_kps(img, x_ct, y_ct, crop_size=40):
+def refine_kps(img, x_ct, y_ct, scale, crop_size):
     refined_x_ct, refined_y_ct = x_ct, y_ct
 
     img_height, img_width = img.shape[:2]
-    x_min = max(x_ct - crop_size, 0)
-    x_max = min(img_height, x_ct + crop_size)
-    y_min = max(y_ct - crop_size, 0)
-    y_max = min(img_width, y_ct + crop_size)
+    x_min = int(max(x_ct - crop_size * scale, 0))
+    x_max = int(min(img_height, x_ct + crop_size * scale))
+    y_min = int(max(y_ct - crop_size * scale, 0))
+    y_max = int(min(img_width, y_ct + crop_size * scale))
 
     img_crop = img[x_min:x_max, y_min:y_max]
     lines = detect_lines(img_crop)
@@ -61,8 +61,8 @@ def refine_kps(img, x_ct, y_ct, crop_size=40):
         if len(lines) == 2:
             inters = line_intersection(lines[0], lines[1])
             if inters:
-                new_x_ct = int(inters[1])
-                new_y_ct = int(inters[0])
+                new_x_ct = to_int(inters[1])
+                new_y_ct = to_int(inters[0])
                 if (
                     new_x_ct > 0
                     and new_x_ct < img_crop.shape[0]
@@ -103,10 +103,10 @@ def merge_lines(lines):
                     if dist1 < 20 and dist2 < 20:
                         line = np.array(
                             [
-                                int((x1 + x3) / 2),
-                                int((y1 + y3) / 2),
-                                int((x2 + x4) / 2),
-                                int((y2 + y4) / 2),
+                                to_int((x1 + x3) / 2),
+                                to_int((y1 + y3) / 2),
+                                to_int((x2 + x4) / 2),
+                                to_int((y2 + y4) / 2),
                             ],
                             dtype=np.int32,
                         )
@@ -133,34 +133,128 @@ def get_labeled_points(input_path):
     return []
 
 
-def plot_likelihood_distribution(heatmap, image, scale):
-    i = 0
-    while i < 14:
-        # Draw mask
-        alpha = 0.2
-        mask = alpha + (1 - alpha) * heatmap[i].astype(np.float32)
-        mask = cv2.resize(
-            mask, (image.shape[1], image.shape[0]), interpolation=cv2.INTER_LINEAR
-        )
-        mask = np.stack([mask] * 3, axis=-1)
-        image_to_draw = (image * mask).astype(np.uint8)
+def postprocess(heatmap, scale, thresh, min_radius, max_radius):
+    binary_heatmap = calculate_binary_heatmap(heatmap, thresh)
+    edge_likelihood_map = calculate_edge_likelihood_map(binary_heatmap)
 
-        # Draw hough circles
-        x_pred, y_pred, likelihood, hough_radius = postprocess(
-            heatmap[i], scale, low_thresh=0.6, max_radius=25
-        )
+    # Calculate Hough circles
+    circles = cv2.HoughCircles(
+        binary_heatmap,
+        cv2.HOUGH_GRADIENT,
+        dp=1,  # resolution
+        minDist=20,
+        param1=50,
+        param2=2,
+        minRadius=min_radius,
+        maxRadius=max_radius,
+    )
+    # if not circles:
+    #     return None, None, None
 
-        image_to_draw = cv2.ellipse(
-            image_to_draw,
-            (int(y_pred + 0.5), int(x_pred + 0.5)),
-            hough_radius,
-            angle=0,
-            startAngle=0,
-            endAngle=360,
-            color=(0, 0, 255),
-            thickness=1,
-        )
+    # Calculate the likelihood of the first circle
+    y_pred = circles[0][0][0]
+    x_pred = circles[0][0][1]
+    hough_radius = circles[0][0][2]
+    likelihood = calculate_circle_likelihood(
+        edge_likelihood_map, x_pred, y_pred, hough_radius
+    )
 
-        # Show plot
-        cv2.imshow("image", image_to_draw)
-        i = wait_for_image_visualization_key(i, 14)
+    if likelihood < CIRCLE_LIKELIHOOD_THRESHOLD:
+        return None, None, None
+
+    return x_pred * scale, y_pred * scale, likelihood
+
+
+def plot_likelihood_distribution(
+    heatmap, image, scale, thresh, min_radius, max_radius, point_idx
+):
+    binary_heatmap = calculate_binary_heatmap(heatmap[point_idx], thresh)
+    edge_likelihood_map = calculate_edge_likelihood_map(binary_heatmap)
+
+    # Draw edge_likelihood_map
+    alpha = 0.3  # Transparency
+    mask = alpha + (1 - alpha) * edge_likelihood_map / 255
+    mask = cv2.resize(
+        mask,
+        (image.shape[1], image.shape[0]),
+        interpolation=cv2.INTER_LINEAR,
+    )
+    mask = np.stack([mask] * 3, axis=-1)
+    image_to_draw = (image * mask).astype(np.uint8)
+
+    # Get Hough circles
+    circles = cv2.HoughCircles(
+        binary_heatmap,
+        cv2.HOUGH_GRADIENT,
+        dp=1,  # resolution
+        minDist=20,
+        param1=50,
+        param2=2,
+        minRadius=min_radius,
+        maxRadius=max_radius,
+    )
+
+    if circles is not None:
+        for i in range(circles.shape[1]):
+            y = circles[0][i][0]
+            x = circles[0][i][1]
+            radius = circles[0][i][2]
+            likelihood = calculate_circle_likelihood(edge_likelihood_map, x, y, radius)
+            x *= scale
+            y *= scale
+            radius *= scale
+
+            # Draw hough circles
+            image_to_draw = cv2.circle(
+                image_to_draw,
+                (to_int(y), to_int(x)),
+                radius=to_int(radius),
+                color=(0, 0, 255),
+                thickness=1,
+            )
+            # Draw circle radius
+            image_to_draw = cv2.putText(
+                image_to_draw,
+                str(to_int(radius)),
+                (to_int(y), to_int(x)),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                fontScale=0.4,
+                color=(255, 255, 255),
+                thickness=1,
+            )
+            # Draw circle likelihood
+            image_to_draw = cv2.putText(
+                image_to_draw,
+                str(f"({likelihood:.2f})"),
+                (to_int(y), to_int(x + 20)),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                fontScale=0.6,
+                color=(255, 255, 255),
+                thickness=1,
+            )
+
+    # Draw ruler boxes
+    ruler_size = 20
+    start_point = (0, 0)
+    end_point = (to_int(ruler_size * scale), to_int(ruler_size * scale))
+    image_to_draw = cv2.rectangle(
+        image_to_draw,
+        start_point,
+        end_point,
+        color=(0, 0, 255),
+        thickness=1,
+    )
+    image_to_draw = cv2.putText(
+        image_to_draw,
+        str(20),
+        end_point,
+        cv2.FONT_HERSHEY_SIMPLEX,
+        fontScale=0.4,
+        color=(255, 255, 255),
+        thickness=1,
+    )
+
+    # Show plot
+    cv2.imshow("image", image_to_draw)
+
+    return wait_for_image_visualization_key(point_idx, OUTPUT_POINT_NUM)

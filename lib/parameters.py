@@ -3,6 +3,16 @@ import numpy as np
 # Shape of images for model input
 OUTPUT_WIDTH = 640
 OUTPUT_HEIGHT = 360
+OUTPUT_POINT_NUM = 14
+
+# Hough circle detection
+MODEL_OUTPUT_BIN_THRESHOLD = 0.6
+CIRCLE_MIN_RADIUS = 10
+CIRCLE_MAX_RADIUS = 25
+CIRCLE_LIKELIHOOD_THRESHOLD = 0.3
+
+# Line intersction refinement
+REFINE_CROP_SIZE = 20
 
 # Calibration matrix initial guess
 CALIBRATION_FOCUS_CONST = 1000
