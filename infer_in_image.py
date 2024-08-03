@@ -6,17 +6,22 @@ import argparse
 
 from lib.tracknet import BallTrackerNet
 from lib.postprocess import postprocess, refine_kps, get_labeled_points
-from lib.homography import get_trans_matrix, refer_kps
+from lib.parameters import *
+from lib.calibration import *
 
 
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model_path", type=str, help="path to model")
+    parser.add_argument(
+        "--model_path",
+        type=str,
+        default="model/model_tennis_court_det.pt",
+        help="path to model",
+    )
     parser.add_argument(
         "--input_path",
         type=str,
-        default="model/model_tennis_court_det.pt",
         help="path to input image",
     )
     parser.add_argument("--output_path", type=str, help="path to output image")
@@ -26,17 +31,12 @@ if __name__ == "__main__":
         help="whether to use refine kps postprocessing",
     )
     parser.add_argument(
-        "--use_homography",
-        action="store_true",
-        help="whether to use homography postprocessing",
-    )
-    parser.add_argument(
         "--plot_label", action="store_true", help="whether to plot the train/val label"
     )
     parser.add_argument(
-        "--apply_camera_calibration",
+        "--plot_world_3d_coord",
         action="store_true",
-        help="whether to plot the train/val label",
+        help="whether to apply 2d to 3d conversion and plot 3d coordinates",
     )
     args = parser.parse_args()
 
@@ -47,9 +47,6 @@ if __name__ == "__main__":
     model.load_state_dict(torch.load(args.model_path, map_location=device))
     model.eval()
     print("model loaded")
-
-    OUTPUT_WIDTH = 640
-    OUTPUT_HEIGHT = 360
 
     image = cv2.imread(args.input_path)
     scale = [image.shape[0] / OUTPUT_HEIGHT, image.shape[1] / OUTPUT_WIDTH]
@@ -63,7 +60,7 @@ if __name__ == "__main__":
     pred = F.sigmoid(out).detach().cpu().numpy()
     print("image inferred")
 
-    points = []
+    inferred_points = []
     for kps_num in range(14):
         heatmap = (pred[kps_num] * 255).astype(np.uint8)
         # cv2.imshow('heatmap', heatmap)
@@ -71,14 +68,7 @@ if __name__ == "__main__":
         x_pred, y_pred = postprocess(heatmap, scale, low_thresh=170, max_radius=25)
         if args.use_refine_kps and kps_num not in [8, 12, 9] and x_pred and y_pred:
             x_pred, y_pred = refine_kps(image, int(y_pred), int(x_pred))
-        points.append((x_pred, y_pred))
-
-    if args.use_homography:
-        print("post processing by homography")
-        matrix_trans = get_trans_matrix(points)
-        if matrix_trans is not None:
-            points = cv2.perspectiveTransform(refer_kps, matrix_trans)
-            points = [np.squeeze(x) for x in points]
+        inferred_points.append((x_pred, y_pred))
 
     if args.plot_label:
         labeled_points = get_labeled_points(args.input_path)
@@ -92,11 +82,11 @@ if __name__ == "__main__":
             )
 
     # Plot inferred points
-    for i in range(len(points)):
-        if points[i][0] is not None:
+    for i in range(len(inferred_points)):
+        if inferred_points[i][0] is not None:
             image = cv2.circle(
                 image,
-                (int(points[i][0]), int(points[i][1])),
+                (int(inferred_points[i][0]), int(inferred_points[i][1])),
                 radius=0,
                 color=(0, 0, 255),
                 thickness=10,
@@ -104,13 +94,32 @@ if __name__ == "__main__":
             image = cv2.putText(
                 image,
                 str(i),
-                (int(points[i][0]), int(points[i][1])),
+                (int(inferred_points[i][0]), int(inferred_points[i][1])),
                 cv2.FONT_HERSHEY_SIMPLEX,
                 fontScale=0.8,
                 color=(0, 0, 0),
                 thickness=2,
             )
 
+    # Plot world 3d coordinates
+    if args.plot_world_3d_coord:
+        world_points = get_world_coordinates_to_plot()
+        camera_matrix, dist_coeffs, rvecs, tvecs = get_calibration_matrix(
+            inferred_points, image.shape, CALIBRATION_OUTLIER_DROP_NUM
+        )
+        pixel_points = world_to_pixel(
+            world_points, camera_matrix, dist_coeffs, rvecs, tvecs
+        )
+        for i in range(len(pixel_points)):
+            image = cv2.circle(
+                image,
+                (int(pixel_points[i][0]), int(pixel_points[i][1])),
+                radius=0,
+                color=(0, 255, 0),
+                thickness=10,
+            )
+
+    # Plot
     if args.output_path:
         cv2.imwrite(args.output_path, image)
     else:
