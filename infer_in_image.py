@@ -5,10 +5,14 @@ import torch.nn.functional as F
 import argparse
 
 from lib.tracknet import BallTrackerNet
-from lib.postprocess import postprocess, refine_kps, get_labeled_points
+from lib.postprocess import (
+    postprocess,
+    refine_kps,
+    get_labeled_points,
+    plot_likelihood_distribution,
+)
 from lib.parameters import *
 from lib.calibration import *
-from lib.utils import wait_for_image_visualization_key
 
 
 if __name__ == "__main__":
@@ -48,37 +52,27 @@ if __name__ == "__main__":
 
     model = BallTrackerNet(out_channels=15)
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    print("using device", device)
+    print("loading model with device", device)
     model = model.to(device)
     model.load_state_dict(torch.load(args.model_path, map_location=device))
     model.eval()
-    print("model loaded")
 
+    print("loading image")
     image = cv2.imread(args.input_path)
     scale = [image.shape[0] / OUTPUT_HEIGHT, image.shape[1] / OUTPUT_WIDTH]
     img = cv2.resize(image, (OUTPUT_WIDTH, OUTPUT_HEIGHT))
     inp = img.astype(np.float32) / 255.0
     inp = torch.tensor(np.rollaxis(inp, 2, 0))
     inp = inp.unsqueeze(0)
-    print("image loaded")
 
+    print("infering image")
     out = model(inp.float().to(device))[0]
     heatmap = F.sigmoid(out).detach().cpu().numpy()
-    print("image inferred")
 
+    print("plotting")
     # plot debug likelihood
     if args.debug_likelihood:
-        i = 0
-        while i < 14:
-            alpha = 0.2
-            mask = alpha + (1 - alpha) * heatmap[i].astype(np.float32)
-            mask = cv2.resize(
-                mask, (image.shape[1], image.shape[0]), interpolation=cv2.INTER_LINEAR
-            )
-            mask = np.stack([mask] * 3, axis=-1)
-            masked_image = (image * mask).astype(np.uint8)
-            cv2.imshow("image", masked_image)
-            i = wait_for_image_visualization_key(i, 14)
+        plot_likelihood_distribution(heatmap, image, scale)
 
     # Get inferred points
     inferred_points = []
@@ -121,6 +115,16 @@ if __name__ == "__main__":
                 fontScale=0.8,
                 color=(0, 0, 0),
                 thickness=2,
+            )
+            image = cv2.ellipse(
+                image,
+                (int(inferred_points[i][1]), int(inferred_points[i][0])),
+                point_likelihoods[i][1],
+                angle=0,
+                startAngle=0,
+                endAngle=360,
+                color=(0, 0, 255),
+                thickness=1,
             )
 
     # Plot world 3d coordinates

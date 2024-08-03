@@ -1,9 +1,8 @@
 import cv2
 import numpy as np
-import os
 import json
 from scipy.spatial import distance
-from lib.utils import line_intersection
+from lib.utils import line_intersection, wait_for_image_visualization_key
 
 
 def postprocess(heatmap, scale, low_thresh=0.6, min_radius=10, max_radius=30):
@@ -37,7 +36,12 @@ def postprocess(heatmap, scale, low_thresh=0.6, min_radius=10, max_radius=30):
         ):
             likelihood = heatmap[int(x_pred + 0.5)][int(y_pred + 0.5)]
 
-    return x_pred * scale[0], y_pred * scale[1], likelihood, hough_radius
+    return (
+        x_pred * scale[0],
+        y_pred * scale[1],
+        likelihood,
+        (int(hough_radius * scale[0] + 0.5), int(hough_radius * scale[1] + 0.5)),
+    )
 
 
 def refine_kps(img, x_ct, y_ct, crop_size=40):
@@ -127,3 +131,36 @@ def get_labeled_points(input_path):
                 return data[i]["kps"]
 
     return []
+
+
+def plot_likelihood_distribution(heatmap, image, scale):
+    i = 0
+    while i < 14:
+        # Draw mask
+        alpha = 0.2
+        mask = alpha + (1 - alpha) * heatmap[i].astype(np.float32)
+        mask = cv2.resize(
+            mask, (image.shape[1], image.shape[0]), interpolation=cv2.INTER_LINEAR
+        )
+        mask = np.stack([mask] * 3, axis=-1)
+        image_to_draw = (image * mask).astype(np.uint8)
+
+        # Draw hough circles
+        x_pred, y_pred, likelihood, hough_radius = postprocess(
+            heatmap[i], scale, low_thresh=0.6, max_radius=25
+        )
+
+        image_to_draw = cv2.ellipse(
+            image_to_draw,
+            (int(y_pred + 0.5), int(x_pred + 0.5)),
+            hough_radius,
+            angle=0,
+            startAngle=0,
+            endAngle=360,
+            color=(0, 0, 255),
+            thickness=1,
+        )
+
+        # Show plot
+        cv2.imshow("image", image_to_draw)
+        i = wait_for_image_visualization_key(i, 14)
