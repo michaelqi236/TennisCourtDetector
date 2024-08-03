@@ -9,8 +9,9 @@ from lib.tracknet import BallTrackerNet
 from lib.postprocess import postprocess, refine_kps
 from lib.homography import get_trans_matrix, refer_kps
 
+
 def read_video(path_video):
-    """ Read video file
+    """Read video file
     :params
         path_video: path to video file
     :return
@@ -30,40 +31,50 @@ def read_video(path_video):
     cap.release()
     return frames, fps
 
+
 def write_video(imgs_new, fps, path_output_video):
     height, width = imgs_new[0].shape[:2]
-    out = cv2.VideoWriter(path_output_video, cv2.VideoWriter_fourcc(*'DIVX'),
-                          fps, (width, height))
+    out = cv2.VideoWriter(
+        path_output_video, cv2.VideoWriter_fourcc(*"DIVX"), fps, (width, height)
+    )
     for num in range(len(imgs_new)):
         frame = imgs_new[num]
         out.write(frame)
-    out.release() 
+    out.release()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model_path', type=str, help='path to model')
-    parser.add_argument('--input_path', type=str, help='path to input video')
-    parser.add_argument('--output_path', type=str, help='path to output video')
-    parser.add_argument('--use_refine_kps', action='store_true', help='whether to use refine kps postprocessing')
-    parser.add_argument('--use_homography', action='store_true', help='whether to use homography postprocessing')
+    parser.add_argument("--model_path", type=str, help="path to model")
+    parser.add_argument("--input_path", type=str, help="path to input video")
+    parser.add_argument("--output_path", type=str, help="path to output video")
+    parser.add_argument(
+        "--use_refine_kps",
+        action="store_true",
+        help="whether to use refine kps postprocessing",
+    )
+    parser.add_argument(
+        "--use_homography",
+        action="store_true",
+        help="whether to use homography postprocessing",
+    )
     args = parser.parse_args()
 
     model = BallTrackerNet(out_channels=15)
-    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    device = "cuda" if torch.cuda.is_available() else "cpu"
     model = model.to(device)
     model.load_state_dict(torch.load(args.model_path, map_location=device))
     model.eval()
 
     OUTPUT_WIDTH = 640
     OUTPUT_HEIGHT = 360
-    
+
     frames, fps = read_video(args.input_path)
     frames_upd = []
     for image in tqdm(frames):
         img = cv2.resize(image, (OUTPUT_WIDTH, OUTPUT_HEIGHT))
-        inp = (img.astype(np.float32) / 255.)
+        inp = img.astype(np.float32) / 255.0
         inp = torch.tensor(np.rollaxis(inp, 2, 0))
         inp = inp.unsqueeze(0)
 
@@ -86,10 +97,13 @@ if __name__ == '__main__':
 
         for j in range(len(points)):
             if points[j][0] is not None:
-                image = cv2.circle(image, (int(points[j][0]), int(points[j][1])),
-                                  radius=0, color=(0, 0, 255), thickness=10)
+                image = cv2.circle(
+                    image,
+                    (int(points[j][0]), int(points[j][1])),
+                    radius=0,
+                    color=(0, 0, 255),
+                    thickness=10,
+                )
         frames_upd.append(image)
 
     write_video(frames_upd, fps, args.output_path)
-
-    

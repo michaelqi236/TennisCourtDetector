@@ -13,36 +13,44 @@ from lib.postprocess import postprocess
 from lib.dataset import courtDataset
 from lib.tracknet import BallTrackerNet
 
-if __name__ == '__main__':
+if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--batch_size', type=int, default=2, help='batch size')
-    parser.add_argument('--model_path', type=str, help='path to model')
-    parser.add_argument('--use_refine_kps', action='store_true', help='whether to use refine kps postprocessing')
-    parser.add_argument('--use_homography', action='store_true', help='whether to use homography postprocessing')
+    parser.add_argument("--batch_size", type=int, default=2, help="batch size")
+    parser.add_argument("--model_path", type=str, help="path to model")
+    parser.add_argument(
+        "--use_refine_kps",
+        action="store_true",
+        help="whether to use refine kps postprocessing",
+    )
+    parser.add_argument(
+        "--use_homography",
+        action="store_true",
+        help="whether to use homography postprocessing",
+    )
     args = parser.parse_args()
 
-    val_dataset = courtDataset('val')
+    val_dataset = courtDataset("val")
     val_loader = torch.utils.data.DataLoader(
         val_dataset,
         batch_size=args.batch_size,
         shuffle=False,
         num_workers=1,
-        pin_memory=True
+        pin_memory=True,
     )
 
     model = BallTrackerNet(out_channels=15)
-    device = 'cuda'
+    device = "cuda"
     model.load_state_dict(torch.load(args.model_path, map_location=device))
     model = model.to(device)
     model.eval()
-    
+
     tp, tn, fp, fn = 0, 0, 0, 0
     MAX_DIST = 7
     dists = []
     INPUT_WIDTH = 1280
     INPUT_HEIGHT = 720
-    
+
     for iter_id, batch in enumerate(val_loader):
         with torch.no_grad():
             batch_size = batch[0].shape[0]
@@ -53,12 +61,21 @@ if __name__ == '__main__':
 
             pred = F.sigmoid(out).detach().cpu().numpy()
             for bs in range(batch_size):
-                img = cv2.imread(os.path.join(val_dataset.path_dataset, 'images', img_names[bs] + '.png'))
+                img = cv2.imread(
+                    os.path.join(
+                        val_dataset.path_dataset, "images", img_names[bs] + ".png"
+                    )
+                )
                 points_pred = []
                 for kps_num in range(14):
                     heatmap = (pred[bs][kps_num] * 255).astype(np.uint8)
                     x_pred, y_pred = postprocess(heatmap, low_thresh=170, max_radius=25)
-                    if args.use_refine_kps and kps_num not in [8, 12, 9] and x_pred and y_pred:
+                    if (
+                        args.use_refine_kps
+                        and kps_num not in [8, 12, 9]
+                        and x_pred
+                        and y_pred
+                    ):
                         x_pred, y_pred = refine_kps(img, int(y_pred), int(x_pred))
                     points_pred.append((x_pred, y_pred))
 
@@ -74,27 +91,33 @@ if __name__ == '__main__':
                     x_pred = point_pred[0]
                     y_pred = point_pred[1]
 
-                    if is_point_in_image(x_pred, y_pred) and is_point_in_image(x_gt, y_gt):
+                    if is_point_in_image(x_pred, y_pred) and is_point_in_image(
+                        x_gt, y_gt
+                    ):
                         dst = distance.euclidean((x_pred, y_pred), (x_gt, y_gt))
                         dists.append(dst)
                         if dst < MAX_DIST:
                             tp += 1
                         else:
                             fp += 1
-                    elif is_point_in_image(x_pred, y_pred) and not is_point_in_image(x_gt, y_gt):
+                    elif is_point_in_image(x_pred, y_pred) and not is_point_in_image(
+                        x_gt, y_gt
+                    ):
                         fp += 1
-                    elif not is_point_in_image(x_pred, y_pred) and is_point_in_image(x_gt, y_gt):
+                    elif not is_point_in_image(x_pred, y_pred) and is_point_in_image(
+                        x_gt, y_gt
+                    ):
                         fn += 1
-                    elif not is_point_in_image(x_pred, y_pred) and not is_point_in_image(x_gt, y_gt):
+                    elif not is_point_in_image(
+                        x_pred, y_pred
+                    ) and not is_point_in_image(x_gt, y_gt):
                         tn += 1
 
-
                 eps = 1e-15
-                precision = round(tp/(tp+fp+eps), 5)
-                accuracy = round((tp+tn)/(tp+tn+fp+fn+eps), 5)
-                print('i = {}, tp = {}, fp = {}, fn = {}, tn = {}, prec = {}, acc = {}, mean_dist = {}'.format(iter_id, tp, fp, fn, tn, precision, accuracy, np.median(dists)))
-    
-    
-    
-    
-    
+                precision = round(tp / (tp + fp + eps), 5)
+                accuracy = round((tp + tn) / (tp + tn + fp + fn + eps), 5)
+                print(
+                    "i = {}, tp = {}, fp = {}, fn = {}, tn = {}, prec = {}, acc = {}, mean_dist = {}".format(
+                        iter_id, tp, fp, fn, tn, precision, accuracy, np.median(dists)
+                    )
+                )
