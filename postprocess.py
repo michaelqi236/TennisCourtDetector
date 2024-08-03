@@ -4,14 +4,14 @@ from scipy.spatial import distance
 from utils import line_intersection
 
 
-def postprocess(heatmap, scale=2, low_thresh=155, min_radius=10, max_radius=30):
+def postprocess(heatmap, scale, low_thresh=155, min_radius=10, max_radius=30):
     x_pred, y_pred = None, None
     ret, heatmap = cv2.threshold(heatmap, low_thresh, 255, cv2.THRESH_BINARY)
     circles = cv2.HoughCircles(heatmap, cv2.HOUGH_GRADIENT, dp=1, minDist=20, param1=50, param2=2, minRadius=min_radius,
                                maxRadius=max_radius)
     if circles is not None:
-        x_pred = circles[0][0][0] * scale
-        y_pred = circles[0][0][1] * scale
+        x_pred = circles[0][0][0] * scale[0]
+        y_pred = circles[0][0][1] * scale[1]
     return x_pred, y_pred
 
 def refine_kps(img, x_ct, y_ct, crop_size=40):

@@ -29,6 +29,7 @@ if __name__ == '__main__':
     OUTPUT_HEIGHT = 360
 
     image = cv2.imread(args.input_path)
+    scale = [image.shape[0]/OUTPUT_HEIGHT, image.shape[1]/OUTPUT_WIDTH]
     img = cv2.resize(image, (OUTPUT_WIDTH, OUTPUT_HEIGHT))
     inp = (img.astype(np.float32) / 255.)
     inp = torch.tensor(np.rollaxis(inp, 2, 0))
@@ -42,7 +43,9 @@ if __name__ == '__main__':
     points = []
     for kps_num in range(14):
         heatmap = (pred[kps_num]*255).astype(np.uint8)
-        x_pred, y_pred = postprocess(heatmap, low_thresh=170, max_radius=25)
+        # cv2.imshow('heatmap', heatmap)
+        # cv2.waitKey(0)
+        x_pred, y_pred = postprocess(heatmap, scale, low_thresh=170, max_radius=25)
         if args.use_refine_kps and kps_num not in [8, 12, 9] and x_pred and y_pred:
             x_pred, y_pred = refine_kps(image, int(y_pred), int(x_pred))
         points.append((x_pred, y_pred))
@@ -58,6 +61,8 @@ if __name__ == '__main__':
         if points[j][0] is not None:
             image = cv2.circle(image, (int(points[j][0]), int(points[j][1])),
                                radius=0, color=(0, 0, 255), thickness=10)
+            image = cv2.putText(image, str(j), (int(points[j][0]), int(points[j][1])), 
+                                cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.8, color=(0, 0, 0),thickness=2)
 
     if args.output_path:
         cv2.imwrite(args.output_path, image)
