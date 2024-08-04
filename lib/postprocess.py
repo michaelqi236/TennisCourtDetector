@@ -61,12 +61,12 @@ def refine_kps(img, x_ct, y_ct, scale, crop_size):
         if len(lines) == 2:
             inters = line_intersection(lines[0], lines[1])
             if inters:
-                new_x_ct = to_int(inters[1])
-                new_y_ct = to_int(inters[0])
+                new_x_ct = inters[1]
+                new_y_ct = inters[0]
                 if (
-                    new_x_ct > 0
+                    new_x_ct >= 0
                     and new_x_ct < img_crop.shape[0]
-                    and new_y_ct > 0
+                    and new_y_ct >= 0
                     and new_y_ct < img_crop.shape[1]
                 ):
                     refined_x_ct = x_min + new_x_ct
@@ -165,7 +165,7 @@ def postprocess(heatmap, scale, thresh, min_radius, max_radius):
     return x_pred * scale, y_pred * scale, likelihood
 
 
-def plot_likelihood_distribution(
+def debug_likelihood_distribution(
     heatmap, image, scale, thresh, min_radius, max_radius, point_idx
 ):
     binary_heatmap = calculate_binary_heatmap(heatmap[point_idx], thresh)

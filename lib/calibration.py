@@ -1,6 +1,5 @@
 import cv2
 import numpy as np
-import matplotlib.pyplot as plt
 from lib.parameters import *
 
 
@@ -13,11 +12,16 @@ def get_world_coordinates_to_plot():
 
 def get_calibration_matrix(pixel_points, image_shape, outlier_drop_num=0):
     court_param = CourtParam()
-    pixel_points_copy = pixel_points
+
+    mask = np.array(
+        [False if pixel_point[0] is None else True for pixel_point in pixel_points]
+    )
+    pixel_points = np.array(pixel_points)[mask]
+    world_points = court_param.court_points[mask]
 
     # Convert points to the required shape
-    pixel_points = np.expand_dims(np.array(pixel_points), axis=0).astype(np.float32)
-    world_points = np.expand_dims(court_param.court_points, axis=0).astype(np.float32)
+    pixel_points = np.expand_dims(pixel_points, axis=0).astype(np.float32)
+    world_points = np.expand_dims(world_points, axis=0).astype(np.float32)
 
     # Initialize camera matrix with reasonable guesses
     camera_matrix = np.array(
@@ -45,33 +49,6 @@ def get_calibration_matrix(pixel_points, image_shape, outlier_drop_num=0):
         | cv2.CALIB_FIX_K5
         | cv2.CALIB_ZERO_TANGENT_DIST,
     )
-
-    # Calibrate again after removing outliers
-    if outlier_drop_num > 0:
-        calibrated_pixel_points = world_to_pixel(
-            court_param.court_points, camera_matrix, dist_coeffs, rvecs, tvecs
-        )
-        pixel_error = np.linalg.norm(
-            calibrated_pixel_points - pixel_points_copy, axis=1
-        )
-        mask_idx = np.argsort(pixel_error)[:-outlier_drop_num]
-        world_points = world_points[:, mask_idx, :]
-        pixel_points = pixel_points[:, mask_idx, :]
-
-        ret, camera_matrix, dist_coeffs, rvecs, tvecs = cv2.calibrateCamera(
-            [world_points],
-            [pixel_points],
-            (image_shape[1], image_shape[0]),
-            camera_matrix,
-            None,
-            flags=cv2.CALIB_USE_INTRINSIC_GUESS
-            | cv2.CALIB_FIX_K1
-            | cv2.CALIB_FIX_K2
-            | cv2.CALIB_FIX_K3
-            | cv2.CALIB_FIX_K4
-            | cv2.CALIB_FIX_K5
-            | cv2.CALIB_ZERO_TANGENT_DIST,
-        )
 
     return camera_matrix, dist_coeffs, rvecs, tvecs
 

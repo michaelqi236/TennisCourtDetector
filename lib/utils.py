@@ -94,3 +94,38 @@ def wait_for_image_visualization_key(idx, max_idx):
             if idx + 1 == max_idx:
                 cv2.destroyAllWindows()
             return idx + 1
+
+
+def draw_text_with_background(
+    img,
+    text,
+    font,
+    pos,
+    font_scale,
+    font_thickness,
+    text_color=(0, 255, 0),
+    text_color_bg=(0, 0, 0),
+):
+
+    x, y = pos
+    text_size, _ = cv2.getTextSize(text, font, font_scale, font_thickness)
+    text_w, text_h = text_size
+    buffer = 5
+    cv2.rectangle(
+        img,
+        (x - buffer, y - buffer),
+        (x + text_w + buffer, y + text_h + buffer),
+        text_color_bg,
+        -1,
+    )
+    cv2.putText(
+        img,
+        text,
+        (x, y + text_h + font_scale - 1),
+        font,
+        font_scale,
+        text_color,
+        font_thickness,
+    )
+
+    return img

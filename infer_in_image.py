@@ -9,11 +9,11 @@ from lib.postprocess import (
     postprocess,
     refine_kps,
     get_labeled_points,
-    plot_likelihood_distribution,
+    debug_likelihood_distribution,
 )
 from lib.parameters import *
 from lib.calibration import *
-from lib.utils import to_int
+from lib.utils import to_int, draw_text_with_background
 
 
 if __name__ == "__main__":
@@ -73,12 +73,13 @@ if __name__ == "__main__":
     out = model(inp.float().to(device))[0]
     heatmap = F.sigmoid(out).detach().cpu().numpy()
 
-    print("plotting")
+    print("Infer done. Post processing")
+
     # plot debug likelihood
     if args.debug_likelihood:
         point_idx = 0
         while point_idx < OUTPUT_POINT_NUM:
-            point_idx = plot_likelihood_distribution(
+            point_idx = debug_likelihood_distribution(
                 heatmap,
                 image,
                 scale,
@@ -91,21 +92,20 @@ if __name__ == "__main__":
     # Get inferred points
     inferred_points = []
     point_likelihoods = []
-    for i in range(14):
-        x_pred, y_pred, likelihood = postprocess(
+    for i in range(OUTPUT_POINT_NUM):
+        x, y, likelihood = postprocess(
             heatmap[i],
             scale,
             thresh=MODEL_OUTPUT_BIN_THRESHOLD,
             min_radius=CIRCLE_MIN_RADIUS,
             max_radius=CIRCLE_MAX_RADIUS,
         )
-        if args.use_refine_kps and i not in [8, 12, 9] and x_pred and y_pred:
-            x_pred, y_pred = refine_kps(
-                image, to_int(x_pred), to_int(y_pred), scale, REFINE_CROP_SIZE
-            )
-        inferred_points.append((x_pred, y_pred))
+        if args.use_refine_kps and i not in [8, 12, 9] and x and y:
+            x, y = refine_kps(image, to_int(x), to_int(y), scale, REFINE_CROP_SIZE)
+        inferred_points.append((x, y))
         point_likelihoods.append(likelihood)
 
+    # Plot labeled points
     if args.plot_label:
         labeled_points = get_labeled_points(args.input_path)
         for i in range(len(labeled_points)):
@@ -120,29 +120,30 @@ if __name__ == "__main__":
     # Plot inferred points
     for i in range(len(inferred_points)):
         if inferred_points[i][0] is not None:
-            image = cv2.circle(
+            cv2.circle(
                 image,
                 (to_int(inferred_points[i][1]), to_int(inferred_points[i][0])),
                 radius=0,
                 color=(0, 0, 255),
                 thickness=10,
             )
-            image = cv2.putText(
+            draw_text_with_background(
                 image,
-                str(i),
-                (to_int(inferred_points[i][1]), to_int(inferred_points[i][0])),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                fontScale=0.8,
-                color=(0, 0, 0),
-                thickness=2,
+                str(f"({point_likelihoods[i]:.2f})"),
+                font=cv2.FONT_HERSHEY_PLAIN,
+                pos=(to_int(inferred_points[i][1]), to_int(inferred_points[i][0] + 15)),
+                font_scale=1,
+                font_thickness=1,
+                text_color=(255, 255, 255),
+                text_color_bg=(30, 30, 30),
             )
 
     # Plot world 3d coordinates
     if args.plot_world_3d_coord:
-        world_points = get_world_coordinates_to_plot()
         camera_matrix, dist_coeffs, rvecs, tvecs = get_calibration_matrix(
             inferred_points, image.shape, CALIBRATION_OUTLIER_DROP_NUM
         )
+        world_points = get_world_coordinates_to_plot()
         pixel_points = world_to_pixel(
             world_points, camera_matrix, dist_coeffs, rvecs, tvecs
         )
@@ -155,7 +156,7 @@ if __name__ == "__main__":
                 thickness=10,
             )
 
-    # Plot
+    # Final visualization
     if args.output_path:
         cv2.imwrite(args.output_path, image)
     else:
