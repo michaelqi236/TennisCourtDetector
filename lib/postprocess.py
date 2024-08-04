@@ -3,6 +3,9 @@ import numpy as np
 import json
 from scipy.spatial import distance
 from lib.utils import line_intersection, wait_for_image_visualization_key, to_int
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d.art3d import Poly3DCollection
+
 from lib.parameters import *
 
 
@@ -14,7 +17,7 @@ def calculate_edge_likelihood_map(heatmap):
         edge_likelihood_map, (edge_thickness, edge_thickness), 255
     )
     edge_likelihood_map = (
-        edge_likelihood_map / np.max(edge_likelihood_map) * 255
+        edge_likelihood_map / max(1e-5, np.max(edge_likelihood_map)) * 255
     ).astype(np.uint8)
     # cv2.imshow("blured edge_likelihood_map", edge_likelihood_map)
 
@@ -148,8 +151,9 @@ def postprocess(heatmap, scale, thresh, min_radius, max_radius):
         minRadius=min_radius,
         maxRadius=max_radius,
     )
-    # if not circles:
-    #     return None, None, None
+
+    if circles is None:
+        return None, None, None
 
     # Calculate the likelihood of the first circle
     y_pred = circles[0][0][0]
@@ -258,3 +262,40 @@ def debug_likelihood_distribution(
     cv2.imshow("image", image_to_draw)
 
     return wait_for_image_visualization_key(point_idx, OUTPUT_POINT_NUM)
+
+
+def plot_world_points(all_world_points):
+    """
+    @input all_world_points: [M, N, 3]
+    """
+
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection="3d")
+    for world_points in all_world_points:
+        ax.plot(world_points[:, 0], world_points[:, 1], world_points[:, 2], "-o")
+
+    court_param = CourtParam()
+    court_surface = [
+        [
+            court_param.court_points[0],
+            court_param.court_points[1],
+            court_param.court_points[3],
+            court_param.court_points[2],
+        ]
+    ]
+    poly3d = Poly3DCollection(
+        court_surface,
+        facecolors="cyan",
+        linewidths=1,
+        edgecolors="r",
+        alpha=0.25,
+    )
+    ax.add_collection3d(poly3d)
+
+    ax.set_xlabel("X")
+    ax.set_ylabel("Y")
+    ax.set_zlabel("Z")
+    plt.axis("equal")
+    plt.show()
+    plt.close(fig)
+    exit()

@@ -1,22 +1,16 @@
 import cv2
 import numpy as np
+import os
 import torch
 import torch.nn.functional as F
 import argparse
-import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 
 
 from lib.tracknet import BallTrackerNet
-from lib.postprocess import (
-    postprocess,
-    refine_kps,
-    get_labeled_points,
-    debug_likelihood_distribution,
-)
+from lib.postprocess import *
 from lib.parameters import *
 from lib.calibration import *
-from lib.utils import to_int, draw_text_with_background
+from lib.utils import *
 
 
 if __name__ == "__main__":
@@ -57,6 +51,9 @@ if __name__ == "__main__":
         action="store_true",
         help="Debug likelihood distribution for each of the inferred points",
     )
+    parser.add_argument(
+        "--image_idx", type=int, default=0, help="image idx to start loading"
+    )
     args = parser.parse_args()
 
     model = BallTrackerNet(out_channels=15)
@@ -66,159 +63,144 @@ if __name__ == "__main__":
     model.load_state_dict(torch.load(args.model_path, map_location=device))
     model.eval()
 
-    print("loading image")
-    image = cv2.imread(args.input_path)
-    if image.shape[0] / OUTPUT_HEIGHT != image.shape[1] / OUTPUT_WIDTH:
-        print("Image size must be proportional to", OUTPUT_HEIGHT, "x", OUTPUT_WIDTH)
-        exit()
-    scale = image.shape[0] / OUTPUT_HEIGHT
-    img = cv2.resize(image, (OUTPUT_WIDTH, OUTPUT_HEIGHT))
-    inp = img.astype(np.float32) / 255.0
-    inp = torch.tensor(np.rollaxis(inp, 2, 0))
-    inp = inp.unsqueeze(0)
+    image_idx = args.image_idx
+    file_num = len(os.listdir(args.input_path)) if os.path.isdir(args.input_path) else 1
+    while image_idx < file_num:
+        print("loading image, idx", image_idx)
+        image = load_images(args.input_path, image_idx)
+        if image.shape[0] / OUTPUT_HEIGHT != image.shape[1] / OUTPUT_WIDTH:
+            print(
+                "Image size must be proportional to", OUTPUT_HEIGHT, "x", OUTPUT_WIDTH
+            )
+            exit()
 
-    print("infering image")
-    out = model(inp.float().to(device))[0]
-    heatmap = F.sigmoid(out).detach().cpu().numpy()
+        scale = image.shape[0] / OUTPUT_HEIGHT
+        img = cv2.resize(image, (OUTPUT_WIDTH, OUTPUT_HEIGHT))
+        inp = img.astype(np.float32) / 255.0
+        inp = torch.tensor(np.rollaxis(inp, 2, 0))
+        inp = inp.unsqueeze(0)
 
-    print("Infer done. Post processing")
+        print("infering image")
+        out = model(inp.float().to(device))[0]
+        heatmap = F.sigmoid(out).detach().cpu().numpy()
 
-    # plot debug likelihood
-    if args.debug_likelihood:
-        point_idx = 0
-        while point_idx < OUTPUT_POINT_NUM:
-            point_idx = debug_likelihood_distribution(
-                heatmap,
-                image,
+        print("Infer done. Post processing")
+
+        # plot debug likelihood
+        if args.debug_likelihood:
+            point_idx = 0
+            while point_idx < OUTPUT_POINT_NUM:
+                point_idx = debug_likelihood_distribution(
+                    heatmap,
+                    image,
+                    scale,
+                    thresh=MODEL_OUTPUT_BIN_THRESHOLD,
+                    min_radius=CIRCLE_MIN_RADIUS,
+                    max_radius=CIRCLE_MAX_RADIUS,
+                    point_idx=point_idx,
+                )
+
+        # Get inferred points
+        inferred_points = []
+        point_likelihoods = []
+        for i in range(OUTPUT_POINT_NUM):
+            x, y, likelihood = postprocess(
+                heatmap[i],
                 scale,
                 thresh=MODEL_OUTPUT_BIN_THRESHOLD,
                 min_radius=CIRCLE_MIN_RADIUS,
                 max_radius=CIRCLE_MAX_RADIUS,
-                point_idx=point_idx,
             )
+            if args.use_refine_kps and i not in [8, 12, 9] and x and y:
+                x, y = refine_kps(image, to_int(x), to_int(y), scale, REFINE_CROP_SIZE)
+            inferred_points.append((x, y))
+            point_likelihoods.append(likelihood)
 
-    # Get inferred points
-    inferred_points = []
-    point_likelihoods = []
-    for i in range(OUTPUT_POINT_NUM):
-        x, y, likelihood = postprocess(
-            heatmap[i],
-            scale,
-            thresh=MODEL_OUTPUT_BIN_THRESHOLD,
-            min_radius=CIRCLE_MIN_RADIUS,
-            max_radius=CIRCLE_MAX_RADIUS,
+        # Plot labeled points
+        if args.plot_label:
+            labeled_points = get_labeled_points(args.input_path)
+            for i in range(len(labeled_points)):
+                image = cv2.circle(
+                    image,
+                    (to_int(labeled_points[i][0]), to_int(labeled_points[i][1])),
+                    radius=0,
+                    color=(255, 0, 0),
+                    thickness=10,
+                )
+
+        # Plot inferred points
+        for i in range(len(inferred_points)):
+            if inferred_points[i][0] is not None:
+                cv2.circle(
+                    image,
+                    (to_int(inferred_points[i][1]), to_int(inferred_points[i][0])),
+                    radius=0,
+                    color=(0, 0, 255),
+                    thickness=10,
+                )
+                draw_text_with_background(
+                    image,
+                    str(f"({point_likelihoods[i]:.2f})"),
+                    font=cv2.FONT_HERSHEY_PLAIN,
+                    pos=(
+                        to_int(inferred_points[i][1]),
+                        to_int(inferred_points[i][0] + 15),
+                    ),
+                    font_scale=1,
+                    font_thickness=1,
+                    text_color=(255, 255, 255),
+                    text_color_bg=(30, 30, 30),
+                )
+
+        # Execute conversion
+        camera_matrix, dist_coeffs, rvecs, tvecs = get_calibration_matrix(
+            inferred_points, image.shape
         )
-        if args.use_refine_kps and i not in [8, 12, 9] and x and y:
-            x, y = refine_kps(image, to_int(x), to_int(y), scale, REFINE_CROP_SIZE)
-        inferred_points.append((x, y))
-        point_likelihoods.append(likelihood)
+        # test_conversion(camera_matrix, dist_coeffs, rvecs, tvecs)
 
-    # Plot labeled points
-    if args.plot_label:
-        labeled_points = get_labeled_points(args.input_path)
-        for i in range(len(labeled_points)):
-            image = cv2.circle(
-                image,
-                (to_int(labeled_points[i][0]), to_int(labeled_points[i][1])),
-                radius=0,
-                color=(255, 0, 0),
-                thickness=10,
+        # Calibration camera to get conversion matrix
+        if args.plot_3d_to_2d:
+            world_points = get_world_coordinates_to_plot()
+            pixel_points = world_to_pixel(
+                world_points, camera_matrix, dist_coeffs, rvecs, tvecs
+            )
+            for i in range(len(pixel_points)):
+                image = cv2.circle(
+                    image,
+                    (to_int(pixel_points[i][1]), to_int(pixel_points[i][0])),
+                    radius=0,
+                    color=(0, 255, 0),
+                    thickness=10,
+                )
+
+        # Plot 2d to 3d conversion
+        if args.plot_2d_to_3d:
+            z_candidates = np.linspace(-10, 10, 20)
+            pixel_points = np.array(
+                [
+                    [OUTPUT_HEIGHT * scale / 2, OUTPUT_WIDTH * scale / 2],
+                    [OUTPUT_HEIGHT * scale / 2 + 300, OUTPUT_WIDTH * scale / 2 + 300],
+                    [OUTPUT_HEIGHT * scale / 2 - 300, OUTPUT_WIDTH * scale / 2 + 300],
+                    [OUTPUT_HEIGHT * scale / 2 + 300, OUTPUT_WIDTH * scale / 2 - 300],
+                    [OUTPUT_HEIGHT * scale / 2 - 300, OUTPUT_WIDTH * scale / 2 - 300],
+                ]
             )
 
-    # Plot inferred points
-    for i in range(len(inferred_points)):
-        if inferred_points[i][0] is not None:
-            cv2.circle(
-                image,
-                (to_int(inferred_points[i][1]), to_int(inferred_points[i][0])),
-                radius=0,
-                color=(0, 0, 255),
-                thickness=10,
-            )
-            draw_text_with_background(
-                image,
-                str(f"({point_likelihoods[i]:.2f})"),
-                font=cv2.FONT_HERSHEY_PLAIN,
-                pos=(to_int(inferred_points[i][1]), to_int(inferred_points[i][0] + 15)),
-                font_scale=1,
-                font_thickness=1,
-                text_color=(255, 255, 255),
-                text_color_bg=(30, 30, 30),
-            )
+            all_world_points = []
+            for pixel_point in pixel_points:
+                world_points = pixel_to_world(
+                    pixel_point, camera_matrix, dist_coeffs, rvecs, tvecs, z_candidates
+                )
+                all_world_points.append(world_points)
+            all_world_points = np.array(all_world_points)
 
-    # Execute conversion
-    camera_matrix, dist_coeffs, rvecs, tvecs = get_calibration_matrix(
-        inferred_points, image.shape
-    )
-    # test_conversion(camera_matrix, dist_coeffs, rvecs, tvecs)
+            # Plot 3d points
+            plot_world_points(all_world_points)
 
-    # Calibration camera to get conversion matrix
-    if args.plot_3d_to_2d:
-        world_points = get_world_coordinates_to_plot()
-        pixel_points = world_to_pixel(
-            world_points, camera_matrix, dist_coeffs, rvecs, tvecs
-        )
-        for i in range(len(pixel_points)):
-            image = cv2.circle(
-                image,
-                (to_int(pixel_points[i][1]), to_int(pixel_points[i][0])),
-                radius=0,
-                color=(0, 255, 0),
-                thickness=10,
-            )
-
-    # Plot 2d to 3d conversion
-    if args.plot_2d_to_3d:
-        z_candidates = np.linspace(-10, 10, 20)
-        pixel_points = np.array(
-            [
-                [OUTPUT_HEIGHT * scale / 2, OUTPUT_WIDTH * scale / 2],
-                [OUTPUT_HEIGHT * scale / 2 + 300, OUTPUT_WIDTH * scale / 2 + 300],
-                [OUTPUT_HEIGHT * scale / 2 - 300, OUTPUT_WIDTH * scale / 2 + 300],
-                [OUTPUT_HEIGHT * scale / 2 + 300, OUTPUT_WIDTH * scale / 2 - 300],
-                [OUTPUT_HEIGHT * scale / 2 - 300, OUTPUT_WIDTH * scale / 2 - 300],
-            ]
-        )
-
-        all_world_points = []
-        for pixel_point in pixel_points:
-            world_points = pixel_to_world(
-                pixel_point, camera_matrix, dist_coeffs, rvecs, tvecs, z_candidates
-            )
-            all_world_points.append(world_points)
-        all_world_points = np.array(all_world_points)
-
-        # Plot
-        fig = plt.figure()
-        ax = fig.add_subplot(111, projection="3d")
-        for world_points in all_world_points:
-            ax.plot(world_points[:, 0], world_points[:, 1], world_points[:, 2], "-o")
-
-        court_param = CourtParam()
-        court_surface = [
-            [
-                court_param.court_points[0],
-                court_param.court_points[1],
-                court_param.court_points[3],
-                court_param.court_points[2],
-            ]
-        ]
-        poly3d = Poly3DCollection(
-            court_surface, facecolors="cyan", linewidths=1, edgecolors="r", alpha=0.25
-        )
-        ax.add_collection3d(poly3d)
-
-        ax.set_xlabel("X")
-        ax.set_ylabel("Y")
-        ax.set_zlabel("Z")
-        plt.axis("equal")
-        plt.show()
-        plt.close(fig)
-        exit()
-    else:
-        # OpenCV visualization
-        if args.output_path:
-            cv2.imwrite(args.output_path, image)
         else:
-            cv2.imshow("image", image)
-            cv2.waitKey(0)
+            # OpenCV visualization
+            if args.output_path:
+                cv2.imwrite(args.output_path, image)
+            else:
+                cv2.imshow("image", image)
+                image_idx = wait_for_image_visualization_key(image_idx, file_num)

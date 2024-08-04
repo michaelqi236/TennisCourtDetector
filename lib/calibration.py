@@ -3,15 +3,15 @@ import numpy as np
 from lib.parameters import *
 import copy
 
-"""
-@output points: [N, 3] 
-"""
-
 
 def get_world_coordinates_to_plot():
+    """
+    @output points: [N, 3]
+    """
+
     court_param = CourtParam()
     points = court_param.court_points
-    # points = np.append(points, court_param.net_points, axis=0)
+    points = np.append(points, court_param.net_points, axis=0)
 
     # Define other points
     other_points = np.array([])
@@ -65,13 +65,12 @@ def get_calibration_matrix(pixel_points, image_shape):
     return camera_matrix, dist_coeffs, rvecs, tvecs
 
 
-"""
-@input world_points: [N, 3] 
-@output image_coords: [N, 2] 
-"""
-
-
 def world_to_pixel(world_points, camera_matrix, dist_coeffs, rvecs, tvecs):
+    """
+    @input world_points: [N, 3]
+    @output image_coords: [N, 2]
+    """
+
     # Note: due to all points have z=0, OpenCV doesn't know the direction of z axis.
     # It's observed that OpenCV always has opposite z due to the selection of tennis
     # court coordination. So here we mannually flip the z direction of world points.
@@ -102,14 +101,13 @@ def world_to_pixel(world_points, camera_matrix, dist_coeffs, rvecs, tvecs):
     return image_coords
 
 
-"""
-@input pixel_point: [2] 
-@input z_candidates: [N] 
-@output image_coords: [N, 3] 
-"""
-
-
 def pixel_to_world(pixel_point, camera_matrix, dist_coeffs, rvecs, tvecs, z_candidates):
+    """
+    @input pixel_point: [2]
+    @input z_candidates: [N]
+    @output image_coords: [N, 3]
+    """
+
     # 3d conversion
     pixel_point = np.append(pixel_point, [1])
     R, _ = cv2.Rodrigues(rvecs[0])

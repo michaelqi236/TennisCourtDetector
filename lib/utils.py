@@ -2,6 +2,7 @@ import numpy as np
 from sympy import Line
 import sympy
 import cv2
+import os
 
 
 def to_int(x: float):
@@ -129,3 +130,28 @@ def draw_text_with_background(
     )
 
     return img
+
+
+def load_images(input_path, image_idx):
+    image = None
+    if os.path.isdir(input_path):
+        list_dir = os.listdir(input_path)
+        file_num = len(list_dir)
+        while image_idx < file_num:
+            filename = list_dir[image_idx]
+            file_path = os.path.join(input_path, filename)
+            if not os.path.isfile(file_path) and file_path.lower().endswith(
+                (".png", ".jpg", ".jpeg")
+            ):
+                continue
+
+            image = cv2.imread(file_path)
+            if image is not None:
+                break
+
+    elif os.path.isfile(input_path):
+        if not input_path.lower().endswith((".png", ".jpg", ".jpeg")):
+            return None
+        image = cv2.imread(input_path)
+
+    return image

@@ -1,7 +1,7 @@
 import json
 import cv2
 import argparse
-from lib.utils import wait_for_image_visualization_key
+from lib.utils import wait_for_image_visualization_key, to_int
 
 
 if __name__ == "__main__":
