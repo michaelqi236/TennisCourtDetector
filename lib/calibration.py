@@ -7,10 +7,16 @@ def get_world_coordinates_to_plot():
     court_param = CourtParam()
     points = court_param.court_points
     points = np.append(points, court_param.net_points, axis=0)
+
+    # Define other points
+    other_points = np.array([])
+
+    if (len(other_points)) > 0:
+        points = np.append(points, other_points, axis=0)
     return points
 
 
-def get_calibration_matrix(pixel_points, image_shape, outlier_drop_num=0):
+def get_calibration_matrix(pixel_points, image_shape):
     court_param = CourtParam()
 
     mask = np.array(
@@ -42,6 +48,7 @@ def get_calibration_matrix(pixel_points, image_shape, outlier_drop_num=0):
         camera_matrix,
         None,
         flags=cv2.CALIB_USE_INTRINSIC_GUESS
+        | cv2.CALIB_FIX_ASPECT_RATIO
         | cv2.CALIB_FIX_K1
         | cv2.CALIB_FIX_K2
         | cv2.CALIB_FIX_K3
@@ -54,6 +61,11 @@ def get_calibration_matrix(pixel_points, image_shape, outlier_drop_num=0):
 
 
 def world_to_pixel(world_points, camera_matrix, dist_coeffs, rvecs, tvecs):
+    # Note: due to all points have z=0, OpenCV doesn't know the direction of z axis.
+    # It's observed that OpenCV always has opposite z due to the selection of tennis
+    # court coordination. So here we mannually flip the z direction of world points.
+    world_points[:, 2] *= -1
+
     image_coords, _ = cv2.projectPoints(
         world_points, rvecs[0], tvecs[0], camera_matrix, dist_coeffs
     )

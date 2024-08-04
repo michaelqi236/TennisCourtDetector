@@ -141,11 +141,15 @@ if __name__ == "__main__":
     # Plot world 3d coordinates
     if args.plot_world_3d_coord:
         camera_matrix, dist_coeffs, rvecs, tvecs = get_calibration_matrix(
-            inferred_points, image.shape, CALIBRATION_OUTLIER_DROP_NUM
+            inferred_points, image.shape
         )
         world_points = get_world_coordinates_to_plot()
         pixel_points = world_to_pixel(
-            world_points, camera_matrix, dist_coeffs, rvecs, tvecs
+            world_points,
+            camera_matrix,
+            dist_coeffs,
+            rvecs,
+            tvecs,
         )
         for i in range(len(pixel_points)):
             image = cv2.circle(

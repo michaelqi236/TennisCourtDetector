@@ -16,7 +16,6 @@ REFINE_CROP_SIZE = 20
 
 # Calibration matrix initial guess
 CALIBRATION_FOCUS_CONST = 1000
-CALIBRATION_OUTLIER_DROP_NUM = 3
 
 
 # Params of tennis court in [m]
