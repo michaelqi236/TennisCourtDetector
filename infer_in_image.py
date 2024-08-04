@@ -208,8 +208,6 @@ if __name__ == "__main__":
         )
         ax.add_collection3d(poly3d)
 
-        print(court_surface)
-
         ax.set_xlabel("X")
         ax.set_ylabel("Y")
         ax.set_zlabel("Z")
