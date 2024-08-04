@@ -1,0 +1,4 @@
+<launch>
+  <node name="tennis_court_visualization" pkg="tennis_court" type="tennis_court.py" output="screen"/>
+  <node name="rviz" pkg="rviz" type="rviz" args="-d $(find tennis_court)/rviz/tennis_court.rviz"/>
+</launch>

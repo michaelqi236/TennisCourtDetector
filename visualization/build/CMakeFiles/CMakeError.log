@@ -1,0 +1,55 @@
+Determining if the pthread_create exist failed with the following output:
+Change Dir: /root/TennisCourtDetector/visualization/build/CMakeFiles/CMakeTmp
+
+Run Build Command:"/usr/bin/make" "cmTC_a9d4a/fast"
+/usr/bin/make -f CMakeFiles/cmTC_a9d4a.dir/build.make CMakeFiles/cmTC_a9d4a.dir/build
+make[1]: Entering directory '/root/TennisCourtDetector/visualization/build/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_a9d4a.dir/CheckSymbolExists.c.o
+/usr/bin/cc    -o CMakeFiles/cmTC_a9d4a.dir/CheckSymbolExists.c.o   -c /root/TennisCourtDetector/visualization/build/CMakeFiles/CMakeTmp/CheckSymbolExists.c
+Linking C executable cmTC_a9d4a
+/usr/local/cmake/bin/cmake -E cmake_link_script CMakeFiles/cmTC_a9d4a.dir/link.txt --verbose=1
+/usr/bin/cc      -rdynamic CMakeFiles/cmTC_a9d4a.dir/CheckSymbolExists.c.o  -o cmTC_a9d4a 
+CMakeFiles/cmTC_a9d4a.dir/CheckSymbolExists.c.o: In function `main':
+CheckSymbolExists.c:(.text+0x1b): undefined reference to `pthread_create'
+collect2: error: ld returned 1 exit status
+CMakeFiles/cmTC_a9d4a.dir/build.make:86: recipe for target 'cmTC_a9d4a' failed
+make[1]: *** [cmTC_a9d4a] Error 1
+make[1]: Leaving directory '/root/TennisCourtDetector/visualization/build/CMakeFiles/CMakeTmp'
+Makefile:121: recipe for target 'cmTC_a9d4a/fast' failed
+make: *** [cmTC_a9d4a/fast] Error 2
+
+File /root/TennisCourtDetector/visualization/build/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <pthread.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef pthread_create
+  return ((int*)(&pthread_create))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+
+Determining if the function pthread_create exists in the pthreads failed with the following output:
+Change Dir: /root/TennisCourtDetector/visualization/build/CMakeFiles/CMakeTmp
+
+Run Build Command:"/usr/bin/make" "cmTC_9ffce/fast"
+/usr/bin/make -f CMakeFiles/cmTC_9ffce.dir/build.make CMakeFiles/cmTC_9ffce.dir/build
+make[1]: Entering directory '/root/TennisCourtDetector/visualization/build/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_9ffce.dir/CheckFunctionExists.c.o
+/usr/bin/cc   -DCHECK_FUNCTION_EXISTS=pthread_create   -o CMakeFiles/cmTC_9ffce.dir/CheckFunctionExists.c.o   -c /usr/local/cmake/share/cmake-3.12/Modules/CheckFunctionExists.c
+Linking C executable cmTC_9ffce
+/usr/local/cmake/bin/cmake -E cmake_link_script CMakeFiles/cmTC_9ffce.dir/link.txt --verbose=1
+/usr/bin/cc  -DCHECK_FUNCTION_EXISTS=pthread_create    -rdynamic CMakeFiles/cmTC_9ffce.dir/CheckFunctionExists.c.o  -o cmTC_9ffce -lpthreads 
+/usr/bin/ld: cannot find -lpthreads
+collect2: error: ld returned 1 exit status
+CMakeFiles/cmTC_9ffce.dir/build.make:86: recipe for target 'cmTC_9ffce' failed
+make[1]: *** [cmTC_9ffce] Error 1
+make[1]: Leaving directory '/root/TennisCourtDetector/visualization/build/CMakeFiles/CMakeTmp'
+Makefile:121: recipe for target 'cmTC_9ffce/fast' failed
+make: *** [cmTC_9ffce/fast] Error 2
+
+
