@@ -3,6 +3,7 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 import argparse
+import matplotlib.pyplot as plt
 
 from lib.tracknet import BallTrackerNet
 from lib.postprocess import (
@@ -40,9 +41,14 @@ if __name__ == "__main__":
         "--plot_label", action="store_true", help="whether to plot the train/val label"
     )
     parser.add_argument(
-        "--plot_world_3d_coord",
+        "--plot_3d_to_2d",
         action="store_true",
-        help="whether to apply 2d to 3d conversion and plot 3d coordinates",
+        help="whether to apply calibration conversion and plot 3d coord in 2d picture",
+    )
+    parser.add_argument(
+        "--plot_2d_to_3d",
+        action="store_true",
+        help="whether to apply calibration conversion and plot pixel position in 3d. For now we only support to print.",
     )
     parser.add_argument(
         "--debug_likelihood",
@@ -138,11 +144,12 @@ if __name__ == "__main__":
                 text_color_bg=(30, 30, 30),
             )
 
-    # Plot world 3d coordinates
-    if args.plot_world_3d_coord:
-        camera_matrix, dist_coeffs, rvecs, tvecs = get_calibration_matrix(
-            inferred_points, image.shape
-        )
+    camera_matrix, dist_coeffs, rvecs, tvecs = get_calibration_matrix(
+        inferred_points, image.shape
+    )
+
+    # Calibration camera to get conversion matrix
+    if args.plot_3d_to_2d:
         world_points = get_world_coordinates_to_plot()
         pixel_points = world_to_pixel(
             world_points,
@@ -160,9 +167,67 @@ if __name__ == "__main__":
                 thickness=10,
             )
 
-    # Final visualization
-    if args.output_path:
-        cv2.imwrite(args.output_path, image)
+    # Plot 2d to 3d conversion
+    if args.plot_2d_to_3d:
+        pixel_points = np.array(
+            [
+                [OUTPUT_HEIGHT * scale / 2, OUTPUT_WIDTH * scale / 2],
+                # [OUTPUT_HEIGHT * scale / 2 + 300, OUTPUT_WIDTH * scale / 2 + 300],
+                # [OUTPUT_HEIGHT * scale / 2 - 300, OUTPUT_WIDTH * scale / 2 + 300],
+                # [OUTPUT_HEIGHT * scale / 2 + 300, OUTPUT_WIDTH * scale / 2 - 300],
+                # [OUTPUT_HEIGHT * scale / 2 - 300, OUTPUT_WIDTH * scale / 2 - 300],
+            ]
+        )
+        print("=== pixel_points")
+        print(pixel_points)
+
+        z_candidates = np.linspace(0, 3, 2)
+
+        R, _ = cv2.Rodrigues(rvecs[0])
+        RT = np.hstack((R, tvecs[0]))
+        P = camera_matrix @ RT
+        ab = P[:2, :2]
+        c = P[:2, 2]
+        d = P[:2, 3]
+        ab_inv_T = np.linalg.inv(ab).T
+        camera_matrix_inv_T = np.linalg.inv(camera_matrix).T
+
+        world_points = []
+        for i in range(len(pixel_points)):
+            for z in z_candidates:
+                pixel_point = np.expand_dims(np.append(pixel_points[i], 1), axis=0)
+                world_point_xy = (
+                    (pixel_point @ camera_matrix_inv_T)[0, :2] - d - c * z
+                ) @ ab_inv_T
+                world_points.append(np.append(world_point_xy, z))
+        world_points = np.array(world_points)
+        print("=== world_points")
+        print(world_points)
+
+        # Verify 2d
+        new_pixel_points = camera_matrix @ (R @ world_points.T + tvecs[0])
+        new_pixel_points = new_pixel_points.T
+        new_pixel_points = new_pixel_points / new_pixel_points[:, 2:]
+
+        print("=== new_pixel_points")
+        print(new_pixel_points)
+
+        # Plot
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection="3d")
+        ax.plot(world_points[:, 0], world_points[:, 1], world_points[:, 2], "-")
+
+        ax.set_xlabel("X")
+        ax.set_ylabel("Y")
+        ax.set_zlabel("Z")
+        plt.axis("equal")
+        plt.show()
+        plt.close(fig)
+        exit()
     else:
-        cv2.imshow("image", image)
-        cv2.waitKey(0)
+        # OpenCV visualization
+        if args.output_path:
+            cv2.imwrite(args.output_path, image)
+        else:
+            cv2.imshow("image", image)
+            cv2.waitKey(0)

@@ -66,9 +66,19 @@ def world_to_pixel(world_points, camera_matrix, dist_coeffs, rvecs, tvecs):
     # court coordination. So here we mannually flip the z direction of world points.
     world_points[:, 2] *= -1
 
-    image_coords, _ = cv2.projectPoints(
-        world_points, rvecs[0], tvecs[0], camera_matrix, dist_coeffs
-    )
+    image_coords = None
+    manual = True
+
+    if not manual:
+        image_coords, _ = cv2.projectPoints(
+            world_points, rvecs[0], tvecs[0], camera_matrix, dist_coeffs
+        )
+    else:
+        R, _ = cv2.Rodrigues(rvecs[0])
+        image_coords = camera_matrix @ (R @ world_points.T + tvecs[0])
+        image_coords = image_coords.T
+        image_coords = image_coords / image_coords[:, 2:]
+
     # Convert from (n, 1, 2) to (n, 2)
     image_coords = image_coords.squeeze()
     return image_coords
