@@ -7,6 +7,7 @@ Panels:
         - /Global Options1
         - /Status1
         - /Grid1
+        - /Grid1/Offset1
         - /Marker1
       Splitter Ratio: 0.5
     Tree Height: 1112
@@ -37,7 +38,7 @@ Visualization Manager:
   Class: ""
   Displays:
     - Alpha: 0.5
-      Cell Size: 1
+      Cell Size: 2
       Class: rviz/Grid
       Color: 160; 160; 164
       Enabled: true
@@ -47,11 +48,11 @@ Visualization Manager:
       Name: Grid
       Normal Cell Count: 0
       Offset:
-        X: 0
-        Y: 0
-        Z: 0
+        X: 5.486400127410889
+        Y: 11.887200355529785
+        Z: -0.05000000074505806
       Plane: XY
-      Plane Cell Count: 10
+      Plane Cell Count: 20
       Reference Frame: world
       Value: true
     - Class: rviz/Marker
@@ -60,6 +61,7 @@ Visualization Manager:
       Name: Marker
       Namespaces:
         tennis_court: true
+        tennis_court_ground: true
       Queue Size: 100
       Value: true
   Enabled: true
@@ -90,25 +92,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 17.579689025878906
+      Distance: 27.713499069213867
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: -0.6491264700889587
-        Y: 0.24428008496761322
-        Z: 0.2862696945667267
+        X: 7.967350482940674
+        Y: 6.472962856292725
+        Z: 3.139897108078003
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.805398166179657
+      Pitch: 0.9753983020782471
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 0.6403979063034058
+      Yaw: 4.813589096069336
     Saved: ~
 Window Geometry:
   Displays:
