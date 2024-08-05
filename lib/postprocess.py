@@ -264,15 +264,17 @@ def debug_likelihood_distribution(
     return wait_for_image_visualization_key(point_idx, OUTPUT_POINT_NUM)
 
 
-def plot_world_points(all_world_points):
+def plot_world_points(all_world_points, camera_position):
     """
     @input all_world_points: [M, N, 3]
+    @input camera_position: [3]
     """
 
     fig = plt.figure()
     ax = fig.add_subplot(111, projection="3d")
+    ax.plot(camera_position[0], camera_position[1], camera_position[2], "o")
     for world_points in all_world_points:
-        ax.plot(world_points[:, 0], world_points[:, 1], world_points[:, 2], "-o")
+        ax.plot(world_points[:, 0], world_points[:, 1], world_points[:, 2], "-")
 
     court_param = CourtParam()
     court_surface = [

@@ -175,14 +175,16 @@ if __name__ == "__main__":
 
         # Plot 2d to 3d conversion
         if args.plot_2d_to_3d:
-            z_candidates = np.linspace(-10, 10, 20)
+            camera_position = get_camera_position(rvecs, tvecs)
+            z_candidates = np.linspace(0, camera_position[2], 2)
+
             pixel_points = np.array(
                 [
                     [OUTPUT_HEIGHT * scale / 2, OUTPUT_WIDTH * scale / 2],
-                    [OUTPUT_HEIGHT * scale / 2 + 300, OUTPUT_WIDTH * scale / 2 + 300],
-                    [OUTPUT_HEIGHT * scale / 2 - 300, OUTPUT_WIDTH * scale / 2 + 300],
-                    [OUTPUT_HEIGHT * scale / 2 + 300, OUTPUT_WIDTH * scale / 2 - 300],
-                    [OUTPUT_HEIGHT * scale / 2 - 300, OUTPUT_WIDTH * scale / 2 - 300],
+                    [OUTPUT_HEIGHT * scale / 2 + 200, OUTPUT_WIDTH * scale / 2 + 200],
+                    [OUTPUT_HEIGHT * scale / 2 - 200, OUTPUT_WIDTH * scale / 2 + 200],
+                    [OUTPUT_HEIGHT * scale / 2 + 200, OUTPUT_WIDTH * scale / 2 - 200],
+                    [OUTPUT_HEIGHT * scale / 2 - 200, OUTPUT_WIDTH * scale / 2 - 200],
                 ]
             )
 
@@ -195,7 +197,7 @@ if __name__ == "__main__":
             all_world_points = np.array(all_world_points)
 
             # Plot 3d points
-            plot_world_points(all_world_points)
+            plot_world_points(all_world_points, camera_position)
 
         else:
             # OpenCV visualization

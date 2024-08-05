@@ -134,6 +134,24 @@ def pixel_to_world(pixel_point, camera_matrix, dist_coeffs, rvecs, tvecs, z_cand
     return world_points
 
 
+def get_camera_position(rvecs, tvecs):
+    """
+    @output camera_position: [3]
+    """
+
+    # The camera position is equalvalent to the position where the cooresponding pixel
+    # position cannot be inferred. i.e. the third row of the conversion equation is zero.
+    R, _ = cv2.Rodrigues(rvecs[0])
+    camera_position = -np.linalg.inv(R) @ tvecs[0]
+    camera_position = np.squeeze(camera_position, axis=1)
+
+    # Due to opposite sign of z axis for the calibration matrixm, we need to flip the z
+    # coordinate.
+    camera_position[2] *= -1
+
+    return camera_position
+
+
 def test_conversion(camera_matrix, dist_coeffs, rvecs, tvecs):
     world_points = np.array([[50, 0, 5]])
 
