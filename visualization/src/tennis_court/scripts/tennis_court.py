@@ -6,6 +6,7 @@ from geometry_msgs.msg import Point
 import tf
 import sys
 import os
+import threading
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
 path_layers = dir_path.split(os.sep)[:3]
@@ -16,19 +17,6 @@ sys.path.append(path)
 from parameters import CourtParam
 
 
-def init_rviz():
-    rospy.init_node("tennis_court_visualization")
-
-    # Start broadcasting the frame in a separate thread
-    import threading
-
-    frame_thread = threading.Thread(target=broadcast_frame)
-    frame_thread.start()
-
-    # Wait for the marker publisher to be ready
-    rospy.sleep(2)
-
-
 def broadcast_frame():
     # Create a TransformBroadcaster object
     br = tf.TransformBroadcaster()
@@ -37,7 +25,7 @@ def broadcast_frame():
     frame_id = "world"
     child_frame_id = "map"  # You can use "map" or any other name as needed
 
-    rate = rospy.Rate(10)  # 10 Hz
+    rate = rospy.Rate(1)  # 1 Hz
     while not rospy.is_shutdown():
         br.sendTransform(
             (0, 0, 0),  # Translation (x, y, z)
@@ -284,7 +272,7 @@ def draw_net(all_markers, court_param):
     return all_markers
 
 
-def rviz_run_once():
+def draw_tennis_court():
     marker_pub = rospy.Publisher("visualization_marker", Marker, queue_size=10)
     court_param = CourtParam()
 
@@ -304,5 +292,14 @@ def rviz_run_once():
 
 
 if __name__ == "__main__":
-    init_rviz()
-    rviz_run_once()
+    rospy.init_node("tennis_court_visualization")
+
+    # Init Rviz
+    frame_thread = threading.Thread(target=broadcast_frame)
+    frame_thread.start()
+
+    # Wait for the marker publisher to be ready
+    rospy.sleep(2)
+
+    # Init Tennis court drawing
+    draw_tennis_court()

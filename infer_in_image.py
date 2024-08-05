@@ -1,16 +1,16 @@
 import cv2
 import numpy as np
-import os
+import os, sys
 import torch
 import torch.nn.functional as F
 import argparse
-
 
 from lib.tracknet import BallTrackerNet
 from lib.postprocess import *
 from lib.parameters import *
 from lib.calibration import *
 from lib.utils import *
+from lib import ros_visualization
 
 
 if __name__ == "__main__":
@@ -65,6 +65,7 @@ if __name__ == "__main__":
 
     image_idx = args.image_idx
     file_num = len(os.listdir(args.input_path)) if os.path.isdir(args.input_path) else 1
+    is_first_time_to_run = True
     while image_idx < file_num:
         print("loading image, idx", image_idx)
         image = load_images(args.input_path, image_idx)
@@ -197,7 +198,10 @@ if __name__ == "__main__":
             all_world_points = np.array(all_world_points)
 
             # Plot 3d points
-            plot_world_points(all_world_points, camera_position)
+            # plot_world_points(all_world_points, camera_position)
+            ros_visualization.plot_world_points_with_rviz(
+                all_world_points, camera_position, is_first_time_to_run
+            )
 
         else:
             # OpenCV visualization
@@ -206,3 +210,5 @@ if __name__ == "__main__":
             else:
                 cv2.imshow("image", image)
                 image_idx = wait_for_image_visualization_key(image_idx, file_num)
+
+        is_first_time_to_run = False

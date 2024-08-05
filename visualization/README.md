@@ -9,6 +9,9 @@ docker run -it --env="DISPLAY" --env="QT_X11_NO_MITSHM=1" --volume="/tmp/.X11-un
 ```
 
 # Launch visualization
+
+ROS Melodic is used.
+
 ```
 cd /root/TennisCourtDetector
 source visualization/devel/setup.bash
